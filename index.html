@@ -297,6 +297,7 @@
       let recordingStream = null;
       let recordingChunks = [];
       let recordingTimeout = null;
+      let analysisAvailable = false;
 
       function showMessage(text, isError = false) {
         message.textContent = text;
@@ -321,7 +322,7 @@
         fileDetails.hidden = false;
         preview.src = previewUrl;
         preview.hidden = false;
-        analyzeButton.disabled = false;
+        analyzeButton.disabled = !analysisAvailable;
         resultContent.hidden = true;
         resultEmpty.hidden = false;
         showMessage("");
@@ -337,6 +338,28 @@
         previewUrl = null;
         analyzeButton.disabled = true;
         showMessage("");
+      }
+
+      async function checkAnalysisAvailability() {
+        try {
+          const response = await fetch("/health", { cache: "no-store" });
+          if (!response.ok) throw new Error("The analysis service is unavailable.");
+          const health = await response.json();
+          analysisAvailable = health.analysis_available === true;
+          if (!analysisAvailable) {
+            showMessage(
+              health.analysis_unavailable_reason ||
+                "Audio analysis is currently unavailable on this host.",
+              true,
+            );
+          } else if (!selectedFile) {
+            showMessage("");
+          }
+        } catch {
+          analysisAvailable = false;
+          showMessage("Could not check analysis availability. Please try again later.", true);
+        }
+        analyzeButton.disabled = !selectedFile || !analysisAvailable;
       }
 
       function encodeWav(samples, sampleRate) {
@@ -455,7 +478,7 @@
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (!selectedFile) return;
+        if (!selectedFile || !analysisAvailable) return;
 
         const body = new FormData();
         body.append("audio", selectedFile);
@@ -493,6 +516,8 @@
           analyzeButton.innerHTML = '<span aria-hidden="true">✳</span> Analyze audio';
         }
       });
+
+      checkAnalysisAvailability();
     </script>
   </body>
 </html>

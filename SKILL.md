@@ -27,19 +27,17 @@ downloads the model from Hugging Face and can take a few minutes.
 
 ## Deployment
 
-The Render service runs the FastAPI backend and serves the app locally. The
-Vercel project serves the same `index.html` and forwards `/api/analyze` to
-Render. Deploy the Render service from `render.yaml` first, then deploy this
-repository to Vercel and set the `RENDER_API_URL` project environment variable
-to the Render service URL (for example, `https://voiceshield-api.onrender.com`).
-The Vercel function uses a 60-second maximum duration; a plan that supports
-that duration is required.
+The Render blueprint uses the free web-service plan and serves the application
+without requiring a payment method. Free instances have limited memory and spin
+down when idle. Audio analysis is explicitly disabled in this free deployment
+because the model requires at least 1 GiB of memory; the public site reports
+this instead of claiming to analyze audio.
 
-The Render blueprint uses a paid Starter instance because loading and running
-the speech model needs more memory than a free instance reliably provides.
-It preloads the model before reporting healthy so the first Vercel analysis
-does not time out while downloading model weights. Review the plan and its cost
-before creating the service.
+The Vercel project can serve the same `index.html` and forward `/api/analyze` to
+Render. Deploy Render first, then set the Vercel `RENDER_API_URL` environment
+variable to the Render service URL (for example,
+`https://voiceshield-api.onrender.com`). The Vercel function uses a 60-second
+maximum duration; a plan that supports that duration is required.
 
 ## Limitations
 

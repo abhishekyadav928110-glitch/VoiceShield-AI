@@ -1,4 +1,5 @@
 import io
+import os
 import unittest
 from unittest.mock import patch
 
@@ -29,6 +30,42 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+
+    def test_health_reports_analysis_availability(self):
+        with patch(
+            "main.get_analysis_unavailable_reason",
+            return_value="Not enough memory.",
+        ):
+            response = self.client.get("/health")
+
+        self.assertFalse(response.json()["analysis_available"])
+        self.assertEqual(
+            response.json()["analysis_unavailable_reason"],
+            "Not enough memory.",
+        )
+
+    def test_free_deployment_disables_model_analysis(self):
+        with patch.dict(os.environ, {"ANALYSIS_ENABLED": "false"}):
+            response = self.client.get("/health")
+
+        self.assertFalse(response.json()["analysis_available"])
+        self.assertIn(
+            "disabled on this free deployment",
+            response.json()["analysis_unavailable_reason"],
+        )
+
+    def test_analysis_fails_clearly_when_host_has_insufficient_memory(self):
+        with patch(
+            "main.get_analysis_unavailable_reason",
+            return_value="Not enough memory.",
+        ):
+            response = self.client.post(
+                "/api/analyze",
+                files={"audio": ("clip.wav", make_wav(), "audio/wav")},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"], "Not enough memory.")
 
     def test_analysis_returns_both_class_scores(self):
         with patch("main.analyze_audio", return_value=(0.7, 0.3)):

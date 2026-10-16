@@ -2,7 +2,7 @@ services:
   - type: web
     name: voiceshield-api
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: pip install -r backend-requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
@@ -11,5 +11,5 @@ services:
         value: 3.12.8
       - key: MODEL_ID
         value: MelodyMachine/Deepfake-audio-detection-V2
-      - key: PRELOAD_MODEL
-        value: "true"
+      - key: ANALYSIS_ENABLED
+        value: "false"
