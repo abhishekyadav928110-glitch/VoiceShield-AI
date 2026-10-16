@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#090f1b">
+    <meta name="description" content="Check a short audio clip for signs of AI-generated speech with VoiceShield.">
+    <link rel="icon" href="data:,">
+    <title>VoiceShield — Audio authenticity check</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #090f1b;
+        color: #eef3fb;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        --muted: #93a0b5;
+        --line: rgba(156, 174, 202, .16);
+        --mint: #73e0bd;
+        --panel: rgba(18, 28, 44, .88);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        background:
+          radial-gradient(ellipse at 84% 2%, rgba(51, 111, 124, .2), transparent 33rem),
+          radial-gradient(ellipse at 8% 42%, rgba(57, 74, 124, .17), transparent 34rem),
+          #090f1b;
+      }
+      button, input { font: inherit; }
+      button { cursor: pointer; }
+      .shell { width: min(100% - 40px, 1000px); margin: 0 auto; }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 84px;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: -.03em; }
+      .brand-mark {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border: 1px solid rgba(115, 224, 189, .35);
+        border-radius: 12px;
+        background: rgba(115, 224, 189, .1);
+        color: var(--mint);
+        font-size: 20px;
+      }
+      .header-note { color: var(--muted); font-size: 13px; }
+      main { padding: 72px 0 48px; }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--mint);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+      }
+      .eyebrow::before { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); content: ""; }
+      h1 {
+        max-width: 720px;
+        margin: 18px 0 16px;
+        font-size: clamp(38px, 7vw, 66px);
+        line-height: 1.03;
+        letter-spacing: -.055em;
+      }
+      h1 span { color: var(--mint); }
+      .intro { max-width: 610px; margin: 0; color: #aeb9ca; font-size: 17px; line-height: 1.7; }
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(270px, .85fr);
+        gap: 18px;
+        margin-top: 42px;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--panel);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, .18);
+      }
+      .upload-panel { padding: 26px; }
+      .panel-title { margin: 0 0 5px; font-size: 16px; letter-spacing: -.02em; }
+      .panel-hint { margin: 0 0 19px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+      .drop-zone {
+        display: flex;
+        min-height: 206px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+        border: 1px dashed rgba(143, 168, 198, .42);
+        border-radius: 15px;
+        background: rgba(9, 15, 27, .5);
+        text-align: center;
+        transition: border-color .2s, background .2s;
+      }
+      .drop-zone.dragging { border-color: var(--mint); background: rgba(115, 224, 189, .07); }
+      .upload-icon {
+        display: grid;
+        width: 45px;
+        height: 45px;
+        place-items: center;
+        margin-bottom: 12px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        color: var(--mint);
+        font-size: 22px;
+      }
+      .drop-zone strong { font-size: 14px; }
+      .drop-zone p { margin: 7px 0 13px; color: var(--muted); font-size: 12px; }
+      .secondary-button {
+        padding: 8px 13px;
+        border: 1px solid rgba(143, 168, 198, .28);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, .035);
+        color: #e5ecf7;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .secondary-button:hover { border-color: rgba(115, 224, 189, .65); }
+      .record-button { display: block; margin: 12px auto 0; }
+      .file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+      .file-details { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 15px; }
+      .file-name { overflow: hidden; color: #cbd5e4; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+      .clear-button { padding: 4px 7px; border: 0; background: transparent; color: var(--muted); font-size: 12px; }
+      .clear-button:hover { color: #fff; }
+      audio { display: block; width: 100%; height: 40px; margin-top: 11px; }
+      .analyze-button {
+        display: flex;
+        width: 100%;
+        min-height: 47px;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        margin-top: 17px;
+        border: 0;
+        border-radius: 11px;
+        background: var(--mint);
+        color: #09221d;
+        font-size: 14px;
+        font-weight: 750;
+        transition: transform .15s, opacity .15s;
+      }
+      .analyze-button:not(:disabled):hover { transform: translateY(-1px); }
+      .analyze-button:disabled { cursor: not-allowed; opacity: .55; }
+      .result-panel { min-height: 326px; padding: 26px; }
+      .result-empty { display: flex; min-height: 265px; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+      .shield {
+        display: grid;
+        width: 59px;
+        height: 59px;
+        place-items: center;
+        margin-bottom: 18px;
+        border: 1px solid rgba(115, 224, 189, .22);
+        border-radius: 19px;
+        background: rgba(115, 224, 189, .07);
+        color: var(--mint);
+        font-size: 27px;
+      }
+      .result-empty h2 { margin: 0 0 8px; font-size: 16px; }
+      .result-empty p { max-width: 230px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+      .result-content[hidden], .result-empty[hidden], .file-details[hidden], audio[hidden] { display: none; }
+      .result-label { margin: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase; }
+      .verdict { margin: 0 0 22px; font-size: 23px; line-height: 1.2; letter-spacing: -.035em; }
+      .verdict.fake { color: #ffb974; }
+      .verdict.real { color: var(--mint); }
+      .score-row { margin-top: 17px; }
+      .score-heading { display: flex; justify-content: space-between; gap: 12px; color: #cbd5e4; font-size: 12px; }
+      .score-heading strong { color: #f0f4fa; font-variant-numeric: tabular-nums; }
+      .track { height: 7px; margin-top: 9px; overflow: hidden; border-radius: 99px; background: rgba(255, 255, 255, .09); }
+      .fill { width: 0; height: 100%; border-radius: inherit; background: var(--mint); transition: width .5s ease; }
+      .fill.fake { background: #ffb974; }
+      .duration { margin-top: 19px; color: var(--muted); font-size: 12px; }
+      .message { min-height: 18px; margin: 11px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+      .message.error { color: #ff9898; }
+      .disclaimer {
+        display: flex;
+        gap: 12px;
+        margin-top: 18px;
+        padding: 15px 17px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: rgba(18, 28, 44, .5);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .disclaimer strong { flex: 0 0 auto; color: #d7e0ed; }
+      footer { display: flex; justify-content: space-between; gap: 20px; padding: 22px 0 30px; border-top: 1px solid var(--line); color: #718097; font-size: 11px; }
+      @media (max-width: 700px) {
+        .shell { width: min(100% - 28px, 520px); }
+        header { min-height: 70px; }
+        .header-note { max-width: 130px; text-align: right; }
+        main { padding-top: 50px; }
+        .intro { font-size: 15px; }
+        .workspace { grid-template-columns: 1fr; margin-top: 30px; }
+        .upload-panel, .result-panel { padding: 21px; }
+        .result-panel { min-height: 290px; }
+        .result-empty { min-height: 230px; }
+        footer { flex-direction: column; gap: 5px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <div class="brand"><span class="brand-mark" aria-hidden="true">◈</span> VoiceShield</div>
+        <div class="header-note">Audio authenticity screening</div>
+      </header>
+
+      <main>
+        <div class="eyebrow">A clearer signal</div>
+        <h1>Listen beyond<br>what you <span>hear.</span></h1>
+        <p class="intro">Check a short voice recording for patterns associated with AI-generated speech. Get a quick result and a transparent confidence breakdown.</p>
+
+        <section class="workspace" aria-label="Audio analysis">
+          <div class="panel upload-panel">
+            <h2 class="panel-title">Add an audio clip</h2>
+            <p class="panel-hint">Upload a WAV or FLAC file, or record a clip with your microphone. Audio stays in memory while it is analyzed.</p>
+            <form id="upload-form">
+              <label class="drop-zone" id="drop-zone" for="audio-file">
+                <span class="upload-icon" aria-hidden="true">↑</span>
+                <strong>Drop your audio here</strong>
+                <p>WAV or FLAC · up to 4 MB · 1–60 seconds</p>
+                <span class="secondary-button">Browse files</span>
+              </label>
+              <input class="file-input" id="audio-file" name="audio" type="file" accept=".wav,.flac,audio/wav,audio/flac">
+              <button class="secondary-button record-button" id="record-button" type="button">Record voice</button>
+              <div class="file-details" id="file-details" hidden>
+                <span class="file-name" id="file-name"></span>
+                <button class="clear-button" id="clear-button" type="button">Remove</button>
+              </div>
+              <audio id="audio-preview" controls hidden></audio>
+              <button class="analyze-button" id="analyze-button" type="submit" disabled>
+                <span aria-hidden="true">✳</span> Analyze audio
+              </button>
+              <p class="message" id="upload-message" role="status" aria-live="polite"></p>
+            </form>
+          </div>
+
+          <section class="panel result-panel" aria-labelledby="result-heading">
+            <h2 class="panel-title" id="result-heading">Analysis result</h2>
+            <div class="result-empty" id="result-empty">
+              <span class="shield" aria-hidden="true">⛨</span>
+              <h2>Ready when you are</h2>
+              <p>Your result and class scores will appear here after analysis.</p>
+            </div>
+            <div class="result-content" id="result-content" hidden aria-live="polite">
+              <p class="result-label">Screening result</p>
+              <h3 class="verdict" id="verdict"></h3>
+              <div class="score-row">
+                <div class="score-heading"><span>AI-generated likelihood</span><strong id="fake-score">0%</strong></div>
+                <div class="track"><div class="fill fake" id="fake-fill"></div></div>
+              </div>
+              <div class="score-row">
+                <div class="score-heading"><span>Human-voice likelihood</span><strong id="real-score">0%</strong></div>
+                <div class="track"><div class="fill" id="real-fill"></div></div>
+              </div>
+              <p class="duration" id="duration"></p>
+            </div>
+          </section>
+        </section>
+
+        <aside class="disclaimer">
+          <strong>Important</strong>
+          <span>This model provides an estimate, not proof of authenticity. Results can be wrong, especially for unfamiliar accents, noisy recordings, edited audio, or voices unlike its training data. Do not use this screening alone for high-stakes decisions.</span>
+        </aside>
+      </main>
+
+      <footer><span>VoiceShield AI · Audio screening demo</span><span>Files are processed in memory and are not stored by this app.</span></footer>
+    </div>
+
+    <script>
+      const form = document.getElementById("upload-form");
+      const fileInput = document.getElementById("audio-file");
+      const fileDetails = document.getElementById("file-details");
+      const fileName = document.getElementById("file-name");
+      const preview = document.getElementById("audio-preview");
+      const analyzeButton = document.getElementById("analyze-button");
+      const message = document.getElementById("upload-message");
+      const dropZone = document.getElementById("drop-zone");
+      const recordButton = document.getElementById("record-button");
+      const resultEmpty = document.getElementById("result-empty");
+      const resultContent = document.getElementById("result-content");
+      let selectedFile = null;
+      let previewUrl = null;
+      let recorder = null;
+      let recordingStream = null;
+      let recordingChunks = [];
+      let recordingTimeout = null;
+
+      function showMessage(text, isError = false) {
+        message.textContent = text;
+        message.classList.toggle("error", isError);
+      }
+
+      function setFile(file) {
+        if (!file) return;
+        const extension = file.name.split(".").pop().toLowerCase();
+        if (!["wav", "flac"].includes(extension)) {
+          showMessage("Please choose a WAV or FLAC audio file.", true);
+          return;
+        }
+        if (file.size > 4 * 1024 * 1024) {
+          showMessage("This file is larger than the 4 MB upload limit.", true);
+          return;
+        }
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        selectedFile = file;
+        previewUrl = URL.createObjectURL(file);
+        fileName.textContent = file.name;
+        fileDetails.hidden = false;
+        preview.src = previewUrl;
+        preview.hidden = false;
+        analyzeButton.disabled = false;
+        resultContent.hidden = true;
+        resultEmpty.hidden = false;
+        showMessage("");
+      }
+
+      function clearFile() {
+        selectedFile = null;
+        fileInput.value = "";
+        fileDetails.hidden = true;
+        preview.hidden = true;
+        preview.removeAttribute("src");
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+        analyzeButton.disabled = true;
+        showMessage("");
+      }
+
+      function encodeWav(samples, sampleRate) {
+        const bytes = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(bytes);
+        const writeText = (offset, text) => {
+          for (let index = 0; index < text.length; index++) {
+            view.setUint8(offset + index, text.charCodeAt(index));
+          }
+        };
+        writeText(0, "RIFF");
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeText(8, "WAVE");
+        writeText(12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeText(36, "data");
+        view.setUint32(40, samples.length * 2, true);
+        for (let index = 0; index < samples.length; index++) {
+          const sample = Math.max(-1, Math.min(1, samples[index]));
+          view.setInt16(44 + index * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+        }
+        return new File([bytes], "voice-recording.wav", { type: "audio/wav" });
+      }
+
+      async function convertRecording(blob) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) throw new Error("Audio conversion is not supported by this browser.");
+        const context = new AudioContextClass();
+        let decoded;
+        try {
+          decoded = await context.decodeAudioData(await blob.arrayBuffer());
+        } finally {
+          await context.close();
+        }
+        const sampleRate = 16000;
+        const frameCount = Math.max(1, Math.ceil(decoded.duration * sampleRate));
+        const offline = new OfflineAudioContext(1, frameCount, sampleRate);
+        const source = offline.createBufferSource();
+        source.buffer = decoded;
+        source.connect(offline.destination);
+        source.start();
+        const converted = await offline.startRendering();
+        return encodeWav(converted.getChannelData(0), sampleRate);
+      }
+
+      async function toggleRecording() {
+        if (recorder?.state === "recording") {
+          recorder.stop();
+          return;
+        }
+        if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+          showMessage("Microphone recording is not supported by this browser.", true);
+          return;
+        }
+
+        recordButton.disabled = true;
+        try {
+          recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          recordingChunks = [];
+          recorder = new MediaRecorder(recordingStream);
+          recorder.addEventListener("dataavailable", (event) => {
+            if (event.data.size) recordingChunks.push(event.data);
+          });
+          recorder.addEventListener("stop", async () => {
+            clearTimeout(recordingTimeout);
+            recordingStream.getTracks().forEach((track) => track.stop());
+            recordButton.textContent = "Preparing recording…";
+            try {
+              const recording = new Blob(recordingChunks);
+              setFile(await convertRecording(recording));
+            } catch (error) {
+              showMessage(error.message || "The recording could not be converted to WAV audio.", true);
+            } finally {
+              recordButton.textContent = "Record voice";
+              recordButton.disabled = false;
+              recorder = null;
+            }
+          });
+          recorder.start();
+          recordButton.textContent = "Stop recording";
+          recordButton.disabled = false;
+          showMessage("Recording… Select Stop when you are done.");
+          recordingTimeout = setTimeout(() => {
+            if (recorder?.state === "recording") {
+              recorder.stop();
+              showMessage("Recording stopped at 60 seconds.");
+            }
+          }, 60_000);
+        } catch (error) {
+          recordingStream?.getTracks().forEach((track) => track.stop());
+          recordButton.textContent = "Record voice";
+          recordButton.disabled = false;
+          showMessage(error.message || "Microphone access was denied.", true);
+        }
+      }
+
+      fileInput.addEventListener("change", () => setFile(fileInput.files[0]));
+      document.getElementById("clear-button").addEventListener("click", clearFile);
+      recordButton.addEventListener("click", toggleRecording);
+      dropZone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropZone.classList.add("dragging");
+      });
+      dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragging"));
+      dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropZone.classList.remove("dragging");
+        setFile(event.dataTransfer.files[0]);
+      });
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!selectedFile) return;
+
+        const body = new FormData();
+        body.append("audio", selectedFile);
+        analyzeButton.disabled = true;
+        analyzeButton.innerHTML = '<span aria-hidden="true">◌</span> Analyzing…';
+        showMessage("Analyzing the recording. The first request may take a little longer while the model starts.");
+        resultContent.hidden = true;
+        resultEmpty.hidden = false;
+
+        try {
+          const response = await fetch("/api/analyze", { method: "POST", body });
+          const result = await response.json().catch(() => null);
+          if (!response.ok) {
+            throw new Error(result?.detail || `Analysis failed (${response.status}).`);
+          }
+          if (!result) throw new Error("The analysis service returned an invalid response.");
+
+          const fake = Math.round(result.fake_probability * 100);
+          const real = Math.round(result.real_probability * 100);
+          const verdict = document.getElementById("verdict");
+          verdict.textContent = result.verdict;
+          verdict.className = `verdict ${result.fake_probability >= 0.6 ? "fake" : "real"}`;
+          document.getElementById("fake-score").textContent = `${fake}%`;
+          document.getElementById("real-score").textContent = `${real}%`;
+          document.getElementById("fake-fill").style.width = `${fake}%`;
+          document.getElementById("real-fill").style.width = `${real}%`;
+          document.getElementById("duration").textContent = `Clip length · ${result.duration_seconds} seconds`;
+          resultEmpty.hidden = true;
+          resultContent.hidden = false;
+          showMessage("");
+        } catch (error) {
+          showMessage(error.message || "The analysis request failed. Please try again.", true);
+        } finally {
+          analyzeButton.disabled = !selectedFile;
+          analyzeButton.innerHTML = '<span aria-hidden="true">✳</span> Analyze audio';
+        }
+      });
+    </script>
+  </body>
+</html>
